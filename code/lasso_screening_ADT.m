@@ -1,11 +1,11 @@
-function [rejection computation_time] = lasso_screening_ADT(B,x,lambda,verbose,vt_feasible, oneSided, tol)
+function [rejection computation_time] = lasso_screening_ADT(B,x,lambda,verbose,vt_feasible, oneSided)
 
 %Normalize x and B
 %use outside guarantee for normalization, reduce time consumption
 %dim=size(B,1);
 %x = x./sqrt(sum(x.^2,1));
 %B = B./(ones(dim,1)*sqrt(sum(B.^2,1)));
-
+tol=0;
 computation_time = 0;
 
 tic_start = tic;

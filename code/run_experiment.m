@@ -17,22 +17,21 @@ options.random_seed = 99;
 options.training_size = 5000;
 options.testing_size = 1000;
 
-% test to run options: '_NT';  '_ST'; '_DT'; 'ADT';
-options.exp_to_run = [  '_NT'; '_ST'; ];
-
+% test to run options: 'NT';  'ST'; 'DT'; 'ADT';
+options.exp_to_run = {  'NT'; 'ST'; 'DT'; 'ADT'};
+screening_function_handle = {@rand,@lasso_screening_ST, @lasso_screening_DT, @lasso_screening_ADT};
 % set the model parameters
-parameters.lambda_stepsize = 0.1
+parameters.lambda_stepsize = 0.1;
 parameters.lambda_over_lambdamax = 0:parameters.lambda_stepsize:1;
 %parameters = train_model(options, data);
 
+filenames = cell(length(options.exp_to_run),1);
 
-NT_filename = sprintf([options.working_path options.data_name '_' 'NT' '_' num2str(options.random_seed)...
+for i = 1:length(options.exp_to_run)
+filenames{i} = sprintf([options.working_path options.data_name '_' options.exp_to_run{i} '_' num2str(options.random_seed)...
             '_' num2str(options.training_size) '_' num2str(options.testing_size) '_' ...
             num2str(parameters.lambda_stepsize) '.mat']);
-ST_filename = sprintf([options.working_path options.data_name '_' 'ST' '_' num2str(options.random_seed)...
-            '_' num2str(options.training_size) '_' num2str(options.testing_size) '_' ...
-            num2str(parameters.lambda_stepsize) '.mat']);
-
+end
 
 % load the data 
 fprintf('loading data\n')
@@ -90,7 +89,7 @@ testing_sample = testing_data(:,ceil(rand*size(testing_data,2)));
 % set screening options
 verbose = 1;
 vt_feasible = [];
-oneSided = 1;
+oneSided = 0;
 
 
 % set lambda
@@ -99,104 +98,63 @@ lambda = parameters.lambda_over_lambdamax*lambda_max;
 
 %TODO design a better framework to run all the experiments
 
+rejection=nan(length(lambda),length(options.exp_to_run));
+solve_w_screening_time=nan(length(lambda),length(options.exp_to_run));
+
 % solve lasso without screening
-if strmatch('_NT', options.exp_to_run)
+
+if isequal(options.exp_to_run{1},'NT')
   fprintf('noscreening\n')
-  if exist(NT_filename, 'file')
+  if exist(filenames{1}, 'file')
     fprintf('load from cache\n')
-    load(NT_filename);
+    load(filenames{1});
+    solve_w_screening_time(:,1) = tmp_screening_time;
   else
-    solve_wo_screening_time = nan(length(lambda),1); 
     t=0;
     for l=lambda
       fprintf('%f',l)
       t=t+1;
       tic_start = tic; 
       wout = l1ls_featuresign (training_data, testing_sample, l);
-      solve_wo_screening_time(t) = toc(tic_start);
+      solve_w_screening_time(t,1) = toc(tic_start);
     end
   end
 end
 
+% run screening
 
-% run ST
-if strmatch('_ST', options.exp_to_run) 
-  fprintf('ST\n')
-  if exist(ST_filename, 'file')
+for i = 2:length(options.exp_to_run)
+  fprintf([options.exp_to_run{i} '\n'])
+  if exist(filenames{i}, 'file')
     fprintf('load from cache\n')
-    load(ST_filename);
+    load(filenames{i});
+    solve_w_screening_time(:,i) = tmp_screening_time;
+    rejection(:,i)=tmp_rejection_rate;
   else
-    rejection_ST= nan(length(lambda),1);
-    solve_w_screening_time_ST = nan(length(lambda),1); 
     t=0;
     for l=lambda
       t=t+1;
-      [reject_tmp   solve_w_screening_time_ST(t)]=lasso_screening_ST(training_data,testing_sample,l,verbose,vt_feasible, oneSided);
-      rejection_ST(t) = sum(reject_tmp)/length(reject_tmp);
+      [reject_tmp  solve_w_screening_time(t,i)]=screening_function_handle{i}...
+                  (training_data,testing_sample,l,verbose,vt_feasible, oneSided);
+      rejection(t,i) = sum(reject_tmp)/length(reject_tmp);
       tic_start = tic; 
       wout = l1ls_featuresign (training_data(:,~reject_tmp), testing_sample, l);
-      solve_w_screening_time_ST(t) = toc(tic_start) + solve_w_screening_time_ST(t);
+      solve_w_screening_time(t,i) = toc(tic_start) + solve_w_screening_time(t,i);
     end
   end
 end
 
-% run DT
-if strmatch('_DT', options.exp_to_run) 
-  fprintf('DT\n')
-  rejection_DT= nan(length(lambda),1);
-  solve_w_screening_time_DT = nan(length(lambda),1); 
-  t=0;
-  for l=lambda
-    t=t+1;
-    [reject_tmp   solve_w_screening_time_DT(t)]=lasso_screening_DT(training_data,testing_sample,l,verbose,vt_feasible, oneSided,0);
-    rejection_DT(t) = sum(reject_tmp)/length(reject_tmp);
-    tic_start = tic; 
-    wout = l1ls_featuresign (training_data(:,~reject_tmp), testing_sample, l);
-    solve_w_screening_time_DT(t) = toc(tic_start)+solve_w_screening_time_DT(t);
+% caching
+
+for i = 1:length(options.exp_to_run)
+  tmp_screening_time = solve_w_screening_time(:,i);
+  assert(sum(isnan(tmp_screening_time))==0, sprintf('nan in %s screening time',options.exp_to_run{i}));
+  if isequal(options.exp_to_run{i},'NT') 
+    save(filenames{i}, 'tmp_screening_time');
+  else
+    tmp_rejection_rate = rejection(:,i);
+    save(filenames{i}, 'tmp_screening_time', 'tmp_rejection_rate' );
   end
-end
-
-% run ADT
-if strmatch('ADT', options.exp_to_run) 
-  fprintf('ADT\n')
-  rejection_ADT= nan(length(lambda),1);
-  solve_w_screening_time_ADT = nan(length(lambda),1); 
-  t=0;
-  for l=lambda
-    t=t+1;
-    [reject_tmp   solve_w_screening_time_ADT(t)]=lasso_screening_DT(training_data,testing_sample,l,verbose,vt_feasible, oneSided,0);
-    rejection_ADT(t) = sum(reject_tmp)/length(reject_tmp);
-    tic_start = tic; 
-    wout = l1ls_featuresign (training_data(:,~reject_tmp), testing_sample, l, 0);
-    solve_w_screening_time_ADT(t) = toc(tic_start) + solve_w_screening_time_ADT(t);
-  end
-end
-
-% save data to file to eliminate keep reruning the same stuff
-% data_name = [options.data_name]_[testname]_[randomseed]_[options.training_size]_
-%             [options.testing_size]_[labmda_stepsize]
-if exist('solve_wo_screening_time','var')
-save(sprintf([options.working_path options.data_name '_' 'NT' '_' num2str(options.random_seed)...
-            '_' num2str(options.training_size) '_' num2str(options.testing_size) '_' ...
-            num2str(parameters.lambda_stepsize) '.mat']), 'solve_wo_screening_time');
-end       
-
-if exist('solve_w_screening_time_ST','var') & exist('rejection_ST','var')
-save(sprintf([options.working_path options.data_name '_' 'ST' '_' num2str(options.random_seed)...
-            '_' num2str(options.training_size) '_' num2str(options.testing_size) '_' ...
-            num2str(parameters.lambda_stepsize) '.mat']), 'solve_w_screening_time_ST', 'rejection_ST' );
-end
-
-if exist('solve_w_screening_time_DT','var') & exist('rejection_DT','var')
-save(sprintf([options.working_path options.data_name '_' 'DT' '_' num2str(options.random_seed)...
-            '_' num2str(options.training_size) '_' num2str(options.testing_size) '_' ...
-            num2str(parameters.lambda_stepsize) '.mat']), 'solve_w_screening_time_DT', 'rejection_DT' );
-end
-
-if exist('solve_w_screening_time_ADT','var') & exist('rejection_ADT','var')
-save(sprintf([options.working_path options.data_name '_' 'ADT' '_' num2str(options.random_seed)...
-            '_' num2str(options.training_size) '_' num2str(options.testing_size) '_' ...
-            num2str(parameters.lambda_stepsize) '.mat']), 'solve_w_screening_time_ADT', 'rejection_ADT' );
 end
 
 % run THT 
@@ -211,9 +169,10 @@ end
 % plot results
 figure
 hold on
-plot(lambda, rejection_ST,'*b-') 
-%plot(lambda, rejection_DT,'or-')
-%plot(lambda, rejection_ADT,'xg-') 
+
+for i = 2:length(options.exp_to_run)
+  plot(lambda, rejection(:,i),'*b-') 
+end
 legend('ST','DT','ADT')
 xlabel('lambda')
 ylabel('rejection rate')
@@ -224,9 +183,9 @@ saveas(gcf, [ options.output_path [date '_' options.data_name] '/' 'rejection' ]
 %TODO speed up calculation
 figure
 hold on
-plot(lambda, solve_wo_screening_time./solve_w_screening_time_ST,'*b-') 
-%plot(lambda, solve_wo_screening_time./solve_w_screening_time_DT,'or-')
-%plot(lambda, solve_wo_screening_time./solve_w_screening_time_ADT,'xg-') 
+for i = 2:length(options.exp_to_run)
+  plot(lambda, solve_w_screening_time(:,1)./solve_w_screening_time(:,i),'*b-') 
+end
 legend('ST','DT','ADT')
 xlabel('lambda')
 ylabel('rejection rate')
