@@ -3,9 +3,12 @@
 
 clear
 
+
 % set the algorithm options
 fprintf('loading options\n')
 options.data_name = 'mnist';
+options.time = clock
+options.time = [date '-' num2str(options.time(4)) num2str(options.time(5))]
 options.input_path = '../data/input/'; 
 options.training_dataset = 'train-images-idx3-ubyte';
 options.training_label = 'train-labels-idx1-ubyte';
@@ -16,12 +19,13 @@ options.output_path = '../data/output/' ;
 options.random_seed = 99;
 options.training_size = 5000;
 options.testing_size = 1000;
-
+options.num_iter = 5;
 % test to run options: 'NT';  'ST'; 'DT'; 'ADT';
-options.exp_to_run = {  'NT'; 'ST'; 'DT'; 'ADT'};
-screening_function_handle = {@rand,@lasso_screening_ST, @lasso_screening_DT, @lasso_screening_ADT};
+options.exp_to_run = {  'NT'; 'ST'; 'DT'; 'ADT';};
+
+screening_function_handle = {@rand,@lasso_screening_ST, @lasso_screening_DT, @lasso_screening_ADT, @lasso_screening_ADT_MP};
 % set the model parameters
-parameters.lambda_stepsize = 0.1;
+parameters.lambda_stepsize = 0.05;
 parameters.lambda_over_lambdamax = 0:parameters.lambda_stepsize:1;
 %parameters = train_model(options, data);
 
@@ -29,8 +33,8 @@ filenames = cell(length(options.exp_to_run),1);
 
 for i = 1:length(options.exp_to_run)
 filenames{i} = sprintf([options.working_path options.data_name '_' options.exp_to_run{i} '_' num2str(options.random_seed)...
-            '_' num2str(options.training_size) '_' num2str(options.testing_size) '_' ...
-            num2str(parameters.lambda_stepsize) '.mat']);
+            '_' num2str(options.training_size) '_' num2str(options.testing_size) '_' num2str(options.num_iter) '_'...
+            num2str(parameters.lambda_stepsize)  '.mat']);
 end
 
 % load the data 
@@ -98,8 +102,8 @@ lambda = parameters.lambda_over_lambdamax*lambda_max;
 
 %TODO design a better framework to run all the experiments
 
-rejection=nan(length(lambda),length(options.exp_to_run));
-solve_w_screening_time=nan(length(lambda),length(options.exp_to_run));
+rejection=zeros(length(lambda),length(options.exp_to_run));
+solve_w_screening_time=zeros(length(lambda),length(options.exp_to_run));
 
 % solve lasso without screening
 
@@ -110,13 +114,15 @@ if isequal(options.exp_to_run{1},'NT')
     load(filenames{1});
     solve_w_screening_time(:,1) = tmp_screening_time;
   else
-    t=0;
-    for l=lambda
-      fprintf('%f',l)
-      t=t+1;
-      tic_start = tic; 
-      wout = l1ls_featuresign (training_data, testing_sample, l);
-      solve_w_screening_time(t,1) = toc(tic_start);
+    for j=1:options.num_iter
+      t=0;
+      for l=lambda
+        fprintf('%f',l)
+        t=t+1;
+        tic_start = tic; 
+        wout = l1ls_featuresign (training_data, testing_sample, l);
+        solve_w_screening_time(t,1) = toc(tic_start) + solve_w_screening_time(t,1);
+      end
     end
   end
 end
@@ -131,24 +137,29 @@ for i = 2:length(options.exp_to_run)
     solve_w_screening_time(:,i) = tmp_screening_time;
     rejection(:,i)=tmp_rejection_rate;
   else
-    t=0;
-    for l=lambda
-      t=t+1;
-      [reject_tmp  solve_w_screening_time(t,i)]=screening_function_handle{i}...
+    for j=1:options.num_iter
+      t=0;
+      for l=lambda
+        t=t+1;
+        [reject_tmp  solve_w_screening_time(t,i)]=screening_function_handle{i}...
                   (training_data,testing_sample,l,verbose,vt_feasible, oneSided);
-      rejection(t,i) = sum(reject_tmp)/length(reject_tmp);
-      tic_start = tic; 
-      wout = l1ls_featuresign (training_data(:,~reject_tmp), testing_sample, l);
-      solve_w_screening_time(t,i) = toc(tic_start) + solve_w_screening_time(t,i);
+        tic_start = tic; 
+        wout = l1ls_featuresign (training_data(:,~reject_tmp), testing_sample, l);
+        solve_w_screening_time(t,i) = toc(tic_start) + solve_w_screening_time(t,i);
+        rejection(t,i) = sum(reject_tmp)/length(reject_tmp) + rejection(t,i);
+      end
     end
   end
 end
+solve_w_screening_time = solve_w_screening_time./options.num_iter;
+rejection = rejection./options.num_iter; 
+
 
 % caching
 
 for i = 1:length(options.exp_to_run)
   tmp_screening_time = solve_w_screening_time(:,i);
-  assert(sum(isnan(tmp_screening_time))==0, sprintf('nan in %s screening time',options.exp_to_run{i}));
+  assert(sum(tmp_screening_time)~=0, sprintf('zero for all %s screening time',options.exp_to_run{i}));
   if isequal(options.exp_to_run{i},'NT') 
     save(filenames{i}, 'tmp_screening_time');
   else
@@ -166,30 +177,48 @@ end
 
 % TODO design a better way to select the line that we want to plot
 
+line_color  = ['c','g','b','r','m','y','k','w']
+line_marker = ['.','o','*','+','x','s','d']
+line_style  = ['-','--',':','-.']
+
 % plot results
 figure
 hold on
 
 for i = 2:length(options.exp_to_run)
-  plot(lambda, rejection(:,i),'*b-') 
+  plot(lambda, rejection(:,i),[line_color(i) line_marker(i) line_style(1)]) 
 end
 legend('ST','DT','ADT')
 xlabel('lambda')
 ylabel('rejection rate')
 title('screening rejection rate')
-mkdir(options.output_path , [date '_' options.data_name] )
-saveas(gcf, [ options.output_path [date '_' options.data_name] '/' 'rejection' ], 'tiff')
+mkdir(options.output_path , [options.time '_' options.data_name] )
+saveas(gcf, [ options.output_path options.time '_' options.data_name '/' 'rejection' ], 'tiff')
 
-%TODO speed up calculation
+% plot speed up
 figure
 hold on
 for i = 2:length(options.exp_to_run)
-  plot(lambda, solve_w_screening_time(:,1)./solve_w_screening_time(:,i),'*b-') 
+  plot(lambda, solve_w_screening_time(:,1)./solve_w_screening_time(:,i),[line_color(i) line_marker(i) line_style(1)]) 
 end
 legend('ST','DT','ADT')
 xlabel('lambda')
 ylabel('rejection rate')
 title('screening speedup')
-mkdir(options.output_path , [date '_' options.data_name] )
-saveas(gcf, [ options.output_path [date '_' options.data_name] '/' 'speedup' ], 'tiff')
+mkdir(options.output_path , [options.time '_' options.data_name] )
+saveas(gcf, [ options.output_path options.time '_' options.data_name '/' 'speedup' ], 'tiff')
 
+% plot speed up vs results
+figure
+hold on
+for i = 2:length(options.exp_to_run)
+  scatter(rejection(:,i), solve_w_screening_time(:,1)./solve_w_screening_time(:,i),[line_color(i) line_marker(i)]) 
+end
+legend('ST','DT','ADT')
+xlabel('rejection rate')
+ylabel('speed up')
+title('screening speedup vs rejection')
+mkdir(options.output_path , [options.time '_' options.data_name] )
+saveas(gcf, [ options.output_path options.time '_' options.data_name  '/' 'speedup_vs_rejection'  ], 'tiff')
+
+save( [ options.output_path options.time '_' options.data_name '/options_and_parameter'], 'options', 'parameters'); 
