@@ -1,5 +1,6 @@
-% experiment for various lasso screening
-% by Cameron P.H. Chen @ Princeton
+% run experiment for various lasso screening
+% by Cameron P.H. Chen @Princeton 
+% contact: pohsuan [at] princeton [dot] edu
 
 clear
 
@@ -10,10 +11,6 @@ options.data_name = 'mnist';
 options.time = clock
 options.time = [date '-' num2str(options.time(4)) num2str(options.time(5))]
 options.input_path = '../data/input/'; 
-options.training_dataset = 'train-images-idx3-ubyte';
-options.training_label = 'train-labels-idx1-ubyte';
-options.testing_dataset = 't10k-images-idx3-ubyte';
-options.testing_label = 't10k-labels-idx1-ubyte';
 options.working_path = '../data/working/' ; 
 options.output_path = '../data/output/' ; 
 options.random_seed = 99;
@@ -45,10 +42,15 @@ diary on;
 
 % load the data 
 fprintf('loading data\n')
-training_data_raw  =  loadMNISTImages([options.input_path options.training_dataset]);
-training_label_raw = loadMNISTLabels([options.input_path options.training_label]);
-testing_data_raw = loadMNISTImages([options.input_path options.testing_dataset]);
-testing_label_raw =loadMNISTLabels([options.input_path options.testing_label]);
+load([ options.input_path options.data_name '_' 'training_data_raw'])
+load([ options.input_path options.data_name '_' 'training_label_raw'])
+load([ options.input_path options.data_name '_' 'testing_data_raw'])
+load([ options.input_path options.data_name '_' 'testing_label_raw'])
+
+%training_data_raw  =  loadMNISTImages([options.input_path options.training_dataset]);
+%training_label_raw = loadMNISTLabels([options.input_path options.training_label]);
+%testing_data_raw = loadMNISTImages([options.input_path options.testing_dataset]);
+%testing_label_raw =loadMNISTLabels([options.input_path options.testing_label]);
 
 % select the training and testing data with uniform distribution accross differnet label
 assert (options.training_size < size(training_data_raw,2),...
