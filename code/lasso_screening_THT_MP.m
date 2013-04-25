@@ -1,4 +1,4 @@
-function [rejection computation_time] = lasso_screening_ADT(B,x,lambda,verbose,vt_feasible, oneSided)
+function [rejection computation_time] = lasso_screening_THT_MP(B,x,lambda,verbose,vt_feasible, oneSided)
 
 %Normalize x and B
 %use outside guarantee for normalization, reduce time consumption

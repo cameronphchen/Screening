@@ -3,8 +3,11 @@
 % contact: pohsuan [at] princeton [dot] edu
 % lasso_screening_IDT(training_data,testing_sample(:,1),0.4,1,[],0);
 function [rejection computation_time] = lasso_screening_IDT(B,x,lambda,verbose,vt_feasible, oneSided)
+
+
+
 % s is the number of iterations
-s=5
+s=2
 tol=0;
 computation_time = 0;
 
@@ -44,11 +47,9 @@ if isempty(vt_feasible)
 else
     r(1) = norm(vt_feasible-q(:,1));
     if verbose
-        fprintf(1,'  Initiating the test using the external feasible solution, sphere radius r=%1.2f\n', r);
+        fprintf(1,'  Initiating the test using the external feasible solution, sphere radius r=%1.2f\n', r(1));
     end
 end
-
-
 
 
 for j1=1:s 
@@ -68,14 +69,15 @@ for j1=1:s
     if j2 < j1
       psi = (q(:,j2)'*b -1)/r(j2);
     end 
-    r = r(j2)
+    r_sc = r(j2);
+    q_sc = q(:,j2);
     %%%%%
-    Vl = -(1-r)*ones(size(t));
-    Vl(t <= (phi(:,j2)-1)/r) = -1+(phi(:,j2)-1)*t(t <= (phi(:,j2)-1)/r) +...
-                               sqrt(r^2-(phi(:,j2)-1)^2)*sqrt(1-t(t <= (phi(:,j2)-1)/r).^2)+tol;
-    Vu = (1-r)*ones(size(t));
-    Vu(t >= -(phi(:,j2)-1)/r) = 1+(phi(:,j2)-1)*t(t >= -(phi(:,j2)-1)/r) -...
-                                sqrt(r^2-(phi(:,j2)-1)^2)*sqrt(1-t(t >= -(phi(:,j2)-1)/r).^2)-tol;
+    Vl = -(1-r_sc)*ones(size(t));
+    Vl(t <= (q_sc'*b-1)/r_sc) = -1+(q_sc'*b-1)*t(t <= (q_sc'*b-1)/r_sc) +...
+                               sqrt(r_sc^2-(q_sc'*b-1)^2)*sqrt(1-t(t <= (q_sc'*b-1)/r_sc).^2)+tol;
+    Vu = (1-r_sc)*ones(size(t));
+    Vu(t >= -(q_sc'*b-1)/r_sc) = 1+(q_sc'*b-1)*t(t >= -(q_sc'*b-1)/r_sc) -...
+                                sqrt(r_sc^2-(q_sc'*b-1)^2)*sqrt(1-t(t >= -(q_sc'*b-1)/r_sc).^2)-tol;
     
     if oneSided
       rejection = (phi(:,j2)<Vu) | rejection;
@@ -92,5 +94,4 @@ computation_time = toc(tic_start);
 
 if verbose 
     fprintf(1,'    The dome test rejected %d codewords\n', sum(rejection==true));
-end
 end
