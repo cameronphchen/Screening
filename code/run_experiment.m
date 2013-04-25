@@ -7,17 +7,17 @@ clear
 
 % set the algorithm options
 fprintf('loading options\n')
-options.data_name = 'mnist';
+options.data_name = 'yalebxf';
 options.time = clock
 options.time = [date '-' num2str(options.time(4)) num2str(options.time(5))]
 options.input_path = '../data/input/'; 
 options.working_path = '../data/working/' ; 
 options.output_path = '../data/output/' ; 
 options.random_seed = 0;
-options.training_size = 1000;
+options.training_size = 100;
 %testing_size has to be the multiple of 10, in order to get equal distribution along different digit
-options.testing_size = 10; 
-options.num_iter = 10;
+options.testing_size = 4; 
+options.num_iter = 4;
 % test to run options: 'NT';  'ST'; 'DT'; 'ADT';
 options.exp_to_run = {  'NT'; 'ST'; 'DT'; 'THT'; 'THT-MP'; 'THT-OMP'; 'IDT'};
 
@@ -62,7 +62,7 @@ solve_w_screening_time=zeros(length(parameters.lambda_over_lambdamax),length(opt
 
 loaded = false(length(options.exp_to_run));
 
-% load from cache
+% load previous result from cache
 for i = 1:length(options.exp_to_run)
   fprintf([options.exp_to_run{i} '\n'])
   if exist(filenames{i}, 'file')
@@ -81,7 +81,7 @@ for k=1:options.num_iter
   %uniformly sample data
   [ training_data training_label testing_data testing_label ] =...
           sample_data(training_data_raw,training_label_raw,testing_data_raw,testing_label_raw...
-                      ,options.training_size,options.testing_size,10);
+                      ,options.training_size,options.testing_size,numel(unique(training_label_raw)));
 
   % data normalization
   training_data = training_data./...
@@ -160,7 +160,7 @@ mkdir(options.output_path , outputfolder )
 close all
 % plot results
 figure
-hold on
+hold on; grid on;
 for i = 2:length(options.exp_to_run)
   plot(parameters.lambda_over_lambdamax, rejection(:,i),[line_color(i) line_marker(i) line_style(1)]) 
 end
@@ -172,7 +172,7 @@ saveas(gcf, [ options.output_path outputfolder  '/' 'rejection' ], 'tiff')
 
 % plot speed up
 figure
-hold on
+hold on; grid on;
 for i = 2:length(options.exp_to_run)
   plot(parameters.lambda_over_lambdamax, solve_w_screening_time(:,1)./solve_w_screening_time(:,i),...
         [line_color(i) line_marker(i) line_style(1)]) 
@@ -185,7 +185,7 @@ saveas(gcf, [ options.output_path outputfolder  '/' 'speedup' ], 'tiff')
 
 % plot speed up vs results
 figure
-hold on
+hold on; grid on;
 for i = 2:length(options.exp_to_run)
   scatter(rejection(:,i), solve_w_screening_time(:,1)./solve_w_screening_time(:,i),[line_color(i) line_marker(i)]) 
 end
