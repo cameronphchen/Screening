@@ -1,5 +1,6 @@
-function [rejection computation_time] = lasso_screening_THT(B,x,lambda,verbose,vt_feasible, oneSided)
+function [rejection computation_time] = lasso_screening_CTHT_MIX04(B,x,lambda,verbose,vt_feasible, oneSided)
 
+ratio = 0.4;
 %Normalize x and B
 %use outside guarantee for normalization, reduce time consumption
 %dim=size(B,1);
@@ -48,7 +49,8 @@ if r~=0
     used(ibm)=true;
     
     bTbi = B'*b;
-    qd=q-(q'*b-1)*b;
+    q2=q-(q'*b-1)*b-b;
+    qd= q+ratio*(q2-q);
     qdTbi=B'*qd;
     
     if oneSided

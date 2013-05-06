@@ -2,7 +2,7 @@
 % by Cameron P.H. Chen @Princeton 
 % contact: pohsuan [at] princeton [dot] edu
 % lasso_screening_IDT(training_data,testing_sample(:,1),0.4,1,[],0);
-function [rejection computation_time] = lasso_screening_IDT(B,x,lambda,verbose,vt_feasible, oneSided)
+function [rejection computation_time] = lasso_screening_IRDT(B,x,lambda,verbose,vt_feasible, oneSided)
 
 
 

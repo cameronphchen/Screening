@@ -7,19 +7,26 @@ clear
 
 % set the algorithm options
 fprintf('loading options\n')
-options.data_name = 'yalebxf';
+options.data_name = 'mnist';
 options.time = clock
 options.time = [date '-' num2str(options.time(4)) num2str(options.time(5))]
 options.input_path = '../data/input/'; 
 options.working_path = '../data/working/' ; 
 options.output_path = '../data/output/' ; 
 options.random_seed = 0;
-options.training_size = 100;
-%testing_size has to be the multiple of 10, in order to get equal distribution along different digit
-options.testing_size = 4; 
-options.num_iter = 4;
+options.training_size = 1000;
+%testing_size and training_size has to be the multiple of 10, in order to get equal distribution along different digit
+options.testing_size = 20; 
+options.num_iter = 5;
 % test to run options: 'NT';  'ST'; 'DT'; 'ADT';
-options.exp_to_run = {  'NT'; 'ST'; 'DT'; 'THT'; 'THT-MP'; 'THT-OMP'; 'IDT'};
+%options.exp_to_run = {  'NT'; 'ST'; 'DT'; 'CTHT'; 'CTHT-MP'; 'CTHT-OMP'; 'IRDT';};
+%options.exp_to_run = {  'NT'; 'CTHT'; 'CTHT-MP'; 'CTHT-MIX00'; 'CTHT-MIX01';'CTHT-MIX02';'CTHT-MIX03';'CTHT-MIX04';...
+%                        'CTHT-MIX05';'CTHT-MIX06';'CTHT-MIX07';'CTHT-MIX08'; 'CTHT-MIX09'; 'CTHT-MIX10';};
+options.exp_to_run = {  'NT'; 'CTHT'; 'CTHT-MP'; 'CTHT-MIX00'; 'CTHT-MIX02';'CTHT-MIX04';...
+                        'CTHT-MIX06';'CTHT-MIX08'; 'CTHT-MIX10';};
+
+
+
 
 rng(options.random_seed);
 
@@ -28,8 +35,19 @@ rng(options.random_seed);
 parameters.lambda_stepsize = 0.05;
 parameters.lambda_over_lambdamax = 0:parameters.lambda_stepsize:1;
 
-screening_function_handle = {@rand,@lasso_screening_ST, @lasso_screening_DT, @lasso_screening_THT,...
-                             @lasso_screening_THT_MP ,@lasso_screening_THT_OMP, @lasso_screening_IDT};
+%screening_function_handle = {@rand,@lasso_screening_ST, @lasso_screening_DT, @lasso_screening_CTHT,...
+%                             @lasso_screening_CTHT_MP ,@lasso_screening_CTHT_OMP, @lasso_screening_IRDT};
+%screening_function_handle = {@rand, @lasso_screening_CTHT, @lasso_screening_CTHT_MP ,@lasso_screening_CTHT_MIX00,...
+%                            @lasso_screening_CTHT_MIX01,@lasso_screening_CTHT_MIX02,@lasso_screening_CTHT_MIX03,...
+%                            @lasso_screening_CTHT_MIX04,@lasso_screening_CTHT_MIX05,@lasso_screening_CTHT_MIX06,...
+%                            @lasso_screening_CTHT_MIX07,@lasso_screening_CTHT_MIX08,@lasso_screening_CTHT_MIX09,...
+%                            @lasso_screening_CTHT_MIX10};
+
+screening_function_handle = {@rand, @lasso_screening_CTHT, @lasso_screening_CTHT_MP ,@lasso_screening_CTHT_MIX00,...
+                            @lasso_screening_CTHT_MIX02, @lasso_screening_CTHT_MIX04,@lasso_screening_CTHT_MIX06,...
+                            @lasso_screening_CTHT_MIX08, @lasso_screening_CTHT_MIX10};
+
+
 
 filenames = cell(length(options.exp_to_run),1);
 
@@ -77,7 +95,7 @@ for i = 1:length(options.exp_to_run)
 end
 
 for k=1:options.num_iter
-  fprintf('%d th iteration', k)
+  fprintf('%d th iteration \n', k)
   %uniformly sample data
   [ training_data training_label testing_data testing_label ] =...
           sample_data(training_data_raw,training_label_raw,testing_data_raw,testing_label_raw...
@@ -96,7 +114,7 @@ for k=1:options.num_iter
   testing_sample = testing_data(:,ceil(rand(options.testing_size,1)*size(testing_data,2)));
 
   % set screening options
-  verbose = 1;  vt_feasible = []; oneSided = 0;
+  verbose = 0;  vt_feasible = []; oneSided = 0;
 
   % run screening
   for i = 1:length(options.exp_to_run)
@@ -121,6 +139,7 @@ for k=1:options.num_iter
       end
     end
     %cacheing
+    % TODO normalize before storing
     tmp_screening_time = solve_w_screening_time(:,i);
     assert(sum(tmp_screening_time)~=0, sprintf('zero for all %s screening time',options.exp_to_run{i}));
     if isequal(options.exp_to_run{i},'NT') 
@@ -134,10 +153,11 @@ end
 
 % normalizetion
 for i=1:length(options.exp_to_run)
-  if loaded(i)==false
+%TODO the normalization before storing, currently not implemented
+%  if loaded(i)==false
       solve_w_screening_time(:,i) = solve_w_screening_time(:,i)./(options.testing_size*options.num_iter)
       rejection(:,i) = rejection(:,i)./(options.testing_size*options.num_iter)
-  end
+%  end
 end
 
 
@@ -146,9 +166,9 @@ end
 % run IDT with OMP selected codewords
 
 
-line_color  = ['c','g','b','r','m','y','k','w'];
-line_marker = ['.','o','*','+','x','s','d'];
-line_style  = ['-','--',':','-.'];
+line_color  = ['g','b','r','k','m','g','b','r','k','m','g','b','r','k','m'];
+line_marker = ['.','*','s','x','v','v','x','*','.','+','*','+','v','*','.'];
+line_style  = ['-','-','-','-','-',':',':',':',':',':'];
 
 outputfolder =  [options.time '_' options.data_name '_' num2str(options.random_seed)...
             '_' num2str(options.training_size) '_' num2str(options.testing_size) '_' num2str(options.num_iter) '_'...
@@ -162,7 +182,8 @@ close all
 figure
 hold on; grid on;
 for i = 2:length(options.exp_to_run)
-  plot(parameters.lambda_over_lambdamax, rejection(:,i),[line_color(i) line_marker(i) line_style(1)]) 
+  plot(parameters.lambda_over_lambdamax, rejection(:,i),[line_color(mod(i,length(line_color))+1)...
+       line_marker(mod(i,length(line_marker))+1) line_style(mod(i,length(line_style))+1)],'LineWidth',1.5) 
 end
 legend(options.exp_to_run(2:end))
 xlabel('lambda/lambda\_max')
@@ -175,7 +196,8 @@ figure
 hold on; grid on;
 for i = 2:length(options.exp_to_run)
   plot(parameters.lambda_over_lambdamax, solve_w_screening_time(:,1)./solve_w_screening_time(:,i),...
-        [line_color(i) line_marker(i) line_style(1)]) 
+       [line_color(mod(i,length(line_color))+1) line_marker(mod(i,length(line_marker))+1)...
+       line_style(mod(i,length(line_style))+1)],'LineWidth',1.5) 
 end
 legend(options.exp_to_run(2:end))
 xlabel('lambda/lambda\_max')
@@ -187,7 +209,9 @@ saveas(gcf, [ options.output_path outputfolder  '/' 'speedup' ], 'tiff')
 figure
 hold on; grid on;
 for i = 2:length(options.exp_to_run)
-  scatter(rejection(:,i), solve_w_screening_time(:,1)./solve_w_screening_time(:,i),[line_color(i) line_marker(i)]) 
+  scatter(rejection(:,i), solve_w_screening_time(:,1)./solve_w_screening_time(:,i),...
+         [line_color(mod(i,length(line_color))+1) line_marker(mod(i,length(line_marker))+1) ]) 
+
 end
 legend(options.exp_to_run(2:end))
 xlabel('rejection rate')
